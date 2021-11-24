@@ -1,0 +1,49 @@
+AWSTemplateFormatVersion: 2010-09-09
+Transform: AWS::Serverless-2016-10-31
+
+Description: 'KeyCore AWS Organizations API'
+
+Parameters:
+  # API Gateway
+  ApiName:
+    Type: String
+  
+  # Lambda Function
+  ExternalId:
+    Type: String
+  MasterAccountRoleArn:
+    Type: String
+  RoleSessionName:
+    Type: String
+
+  # Shared
+  LogGroupRetentionInDays:
+    Type: String
+
+Resources:
+  # API Gateway stack
+  ApiGateway:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: api-gateway.yml
+      Parameters:
+        ApiName: !Ref ApiName
+        LambdaFunctionArn: !GetAtt LambdaFunction.Outputs.FunctionArn
+        LogGroupRetentionInDays: !Ref LogGroupRetentionInDays
+
+  # Organizations API Lambda stack
+  LambdaFunction:
+    Type: 'AWS::CloudFormation::Stack'
+    Properties:
+      TemplateURL: lambda.yml
+      Parameters:
+        ExternalId: !Ref ExternalId
+        LogGroupRetentionInDays: !Ref LogGroupRetentionInDays
+        MasterAccountRoleArn: !Ref MasterAccountRoleArn
+        RoleSessionName: !Ref RoleSessionName 
+
+Outputs:
+  ApiId: 
+    Value: !GetAtt ApiGateway.Outputs.ApiId
+  ApiStageName:
+    Value: !GetAtt ApiGateway.Outputs.ApiStageName

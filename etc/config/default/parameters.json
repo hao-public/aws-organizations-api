@@ -1,0 +1,14 @@
+[
+  { 
+    "ParameterKey": "ApiName",
+    "ParameterValue": "aws-organizations"
+  },
+  { 
+    "ParameterKey": "LogGroupRetentionInDays",
+    "ParameterValue": "14"
+  },
+  { 
+    "ParameterKey": "RoleSessionName",
+    "ParameterValue": "aws-organizations-api"
+  }
+]

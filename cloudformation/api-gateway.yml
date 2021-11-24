@@ -1,0 +1,236 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: API Gateway
+Transform: 'AWS::Serverless-2016-10-31'
+
+Parameters:
+  ApiDomainStackName:
+    Default: ""
+    Type: String
+    Description: Name of API domain name stack
+  ApiName:
+    Default: aws-organizations
+    Type: String
+    Description: Name of API
+  ContextMapping:
+    Default: ""
+    Type: String
+    Description: API Context
+  LambdaFunctionArn:
+    Type: String
+  LogGroupRetentionInDays:
+    Type: String
+    Default: '14'
+  UserPool:
+    Default: ""
+    Type: String
+    Description: Name of environment user pool
+
+Conditions:
+  LogRetentionInDaysSet: !Not [!Equals [!Ref LogGroupRetentionInDays, '']]
+
+Resources:
+  #######################################################
+  # Logging resources
+  #######################################################
+  ApiGatewayLogIAMRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      Path: '/'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: 'AllowServiceToAssumeRole'
+            Effect: 'Allow'
+            Action:
+              - 'sts:AssumeRole'
+            Principal:
+              Service:
+                - 'apigateway.amazonaws.com'
+
+  ApiGatewayLogRoleSettings:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn: !GetAtt ApiGatewayLogIAMRole.Arn
+  
+  ApiAccessLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/apigateway/${ApiName}
+      RetentionInDays: !If [LogRetentionInDaysSet, !Ref LogGroupRetentionInDays, !Ref AWS::NoValue]
+  
+  #######################################################
+  # API Gateway Configuration
+  #######################################################
+  Api:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Ref ApiName
+      StageName: prod
+      EndpointConfiguration: REGIONAL
+      CacheClusterEnabled: false
+      AccessLogSetting:
+        DestinationArn: !GetAtt ApiAccessLogs.Arn
+        Format: '$context.identity.sourceIp,$context.identity.caller,$context.identity.user,$context.requestTime,$context.httpMethod,$context.resourcePath,$context.protocol,$context.status,$context.responseLength,$context.requestId'
+      TracingEnabled: true
+      MethodSettings: [{
+        'LoggingLevel': 'INFO',
+        'MetricsEnabled': true,
+        'DataTraceEnabled': true,
+        'ResourcePath': '/*',
+        'HttpMethod': '*',
+        }]
+      # Cors:
+      #   AllowOrigin: '*'
+      #   MaxAge: '3600'
+      DefinitionBody:
+        openapi: 3.0.0
+        info:
+          contact: 
+            name: KeyCore
+            url: https://keycore.dk
+            email: info@keycore.dk
+          description: KeyCore AWS Organizations API
+          version: 1.0.0
+          title: AWS Organizations API
+        paths:
+          /v1/accounts:
+            get:
+              summary: Gets a lists all member accounts.
+              operationId: ListAccounts
+              responses: {}
+              x-amazon-apigateway-integration:
+                uri: !Sub
+                  - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations'
+                  - FunctionArn: !Ref LambdaFunctionArn
+                passthroughBehavior: 'when_no_match'
+                httpMethod: 'POST'
+                type: 'aws_proxy'
+          /v1/accounts/{AccountId}:
+            get:
+              summary: Describes a member account.
+              operationId: DescribeAccount
+              parameters:
+                - name: AccountId
+                  in: path
+                  description: Account ID
+                  pattern: '^\d{12}$'
+                  required: true
+                  schema:
+                    type: string
+              responses: {}
+              x-amazon-apigateway-integration:
+                uri: !Sub
+                  - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations'
+                  - FunctionArn: !Ref LambdaFunctionArn
+                passthroughBehavior: 'when_no_match'
+                httpMethod: 'POST'
+                type: 'aws_proxy'
+          /v1/children/{ChildType}/{ParentId}:
+            get:
+              summary: Gets a lists all organizational units or accounts that are contained in the specified parent OU or root.
+              operationId: ListChildren
+              parameters:
+                - name: ChildType
+                  in: path
+                  description: 'ACCOUNT | ORGANIZATIONAL_UNIT'
+                  required: true
+                  pattern: 'ACCOUNT|ORGANIZATIONAL_UNIT'
+                  schema:
+                    type: string
+                - name: ParentId
+                  in: path
+                  description: Parent ID
+                  pattern: '^(r-[0-9a-z]{4,32})|(ou-[0-9a-z]{4,32}-[a-z0-9]{8,32})$'
+                  required: true
+                  schema:
+                    type: string
+              responses: {}
+              x-amazon-apigateway-integration:
+                uri: !Sub
+                  - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations'
+                  - FunctionArn: !Ref LambdaFunctionArn
+                passthroughBehavior: 'when_no_match'
+                httpMethod: 'POST'
+                type: 'aws_proxy'
+          /v1/organizational-unit/{OrganizationalUnitId}:
+            get:
+              summary: Retrieves information about an organizational unit (OU).
+              operationId: DescribeOrganizationalUnit
+              parameters:
+                - name: OrganizationalUnitId
+                  in: path
+                  description: The unique identifier (ID) of the organizational unit that you want details about.
+                  required: true
+                  pattern: '^ou-[0-9a-z]{4,32}-[a-z0-9]{8,32}$'
+                  schema:
+                    type: string
+              responses: {}
+              x-amazon-apigateway-integration:
+                uri: !Sub
+                  - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations'
+                  - FunctionArn: !Ref LambdaFunctionArn
+                passthroughBehavior: 'when_no_match'
+                httpMethod: 'POST'
+                type: 'aws_proxy'
+          /v1/parents:
+            get:
+              summary: Lists the root or organizational units (OUs) that serve as the immediate parent of the specified child OU or account
+              operationId: ListParents
+              responses: {}
+              x-amazon-apigateway-integration:
+                uri: !Sub
+                  - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations'
+                  - FunctionArn: !Ref LambdaFunctionArn
+                passthroughBehavior: 'when_no_match'
+                httpMethod: 'POST'
+                type: 'aws_proxy'
+          /v1/roots:
+            get:
+              summary: Lists the roots that are defined in the current organization.
+              operationId: ListRoots
+              responses: {}
+              x-amazon-apigateway-integration:
+                uri: !Sub
+                  - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${FunctionArn}/invocations'
+                  - FunctionArn: !Ref LambdaFunctionArn
+                passthroughBehavior: 'when_no_match'
+                httpMethod: 'POST'
+                type: 'aws_proxy'
+
+        components:
+          securitySchemes:
+            ApiKeyAuth:
+              type: apiKey
+              in: header
+              name: X-API-Key
+
+
+  # This parameter is needed to ensure BasePathMapping is created after Deployment on first deploy
+  # CurrentDeploymentParameter:
+  #   Type: 'AWS::SSM::Parameter'
+  #   Properties:
+  #     Name: !Sub /api/${EnvName}/current/api-deployment
+  #     Type: String
+  #     Value: !Ref Api.Deployment
+  #     Description: Current Api Deployment
+
+  # BasePathMapping:
+  #   Type: AWS::ApiGateway::BasePathMapping
+  #   DependsOn: CurrentDeploymentParameter
+  #   Properties:
+  #     BasePath: !Ref ContextMapping
+  #     DomainName:
+  #       Fn::ImportValue:
+  #         Fn::Sub: '${ApiDomainStackName}-DomainName'
+  #     RestApiId:
+  #       Ref: Api
+  #     Stage: !Ref Api.Stage
+
+Outputs:
+  ApiId:
+    Value: !Ref Api
+  ApiStageName:
+    Value: prod

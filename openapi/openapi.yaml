@@ -1,0 +1,60 @@
+openapi: 3.0.0
+info:
+  contact: 
+    name: KeyCore
+    url: https://keycore.dk
+    email: info@keycore.dk
+  description: KeyCore AWS Organizations API
+  version: 1.0.0
+  title: AWS Organizations API
+paths:
+  /api/v1/describe-account:
+    get:
+      summary: Describes a member account in the AWS organization.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DescribeAccount'
+        required: true
+      responses: {}
+      x-amazon-apigateway-integration:
+          uri: 'arn:aws:apigateway:eu-west-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-west-1:294938223330:function:aws-organizations-api-LambdaFunction-12UMRDG1QLGHW/invocations'
+          passthroughBehavior: 'when_no_match'
+          httpMethod: 'POST'
+          type: 'aws_proxy'
+
+  /api/v1/list-accounts:
+    get:
+      summary: Lists all accounts in the AWS organization.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ListAccounts'
+        required: true
+      responses: {}
+      x-amazon-apigateway-integration:
+          uri: 'arn:aws:apigateway:eu-west-1:lambda:path/2015-03-31/functions/arn:aws:lambda:eu-west-1:294938223330:function:aws-organizations-api-LambdaFunction-12UMRDG1QLGHW/invocations'
+          passthroughBehavior: 'when_no_match'
+          httpMethod: 'POST'
+          type: 'aws_proxy'
+
+components:
+  schemas:
+    DescribeAccount:
+      type: object
+      required:
+        - AccountId
+      properties:
+        AccountId:
+          type: string
+          example: '123456789012'
+          pattern: '^\d{12}$'
+        Token:
+          type: string
+    ListAccounts:
+      type: object
+      properties:
+        Token:
+          type: string

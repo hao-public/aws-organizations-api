@@ -1,0 +1,10 @@
+[
+  { 
+    "ParameterKey": "MasterAccountRoleArn",
+    "ParameterValue": "arn:aws:iam::347300002700:role/organizations-api"
+  },
+  { 
+    "ParameterKey": "ExternalId",
+    "ParameterValue": "5b0bfa4b-4a58-4a7d-a04b-fb2ec2a46e80"
+  }
+]
